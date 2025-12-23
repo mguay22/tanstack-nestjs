@@ -1,8 +1,8 @@
-# TanStack Router + NestJS: Building Fullstack Apps with Modern React
+# TanStack Router + Query + NestJS: Building Fullstack Apps with Modern React
 
 ## Lecture Overview
 
-**Duration:** ~45-60 minutes
+**Duration:** ~60-75 minutes
 **Level:** Intermediate
 **Prerequisites:** Basic React, TypeScript, REST APIs
 
@@ -12,23 +12,26 @@
 
 ### Opening Hook
 
-Today we're building a fullstack application using two powerful frameworks:
+Today we're building a fullstack application using the TanStack ecosystem and NestJS:
 
-- **TanStack Router** - The type-safe routing library for React
-- **NestJS** - A scalable Node.js framework with TypeScript
+- **TanStack Router** - Type-safe routing for React
+- **TanStack Query** - Powerful data fetching and caching
+- **NestJS** - Scalable Node.js framework with TypeScript
 
 By the end of this lecture, you'll understand how to:
 
 1. Set up a monorepo with Turborepo
-2. Create type-safe routes with data loading
-3. Build a REST API with NestJS
-4. Connect frontend and backend seamlessly
+2. Create type-safe routes with search params
+3. Implement data fetching with TanStack Query
+4. Build a REST API with NestJS
+5. Connect everything seamlessly
 
 ### Why This Stack?
 
 | Technology          | Why Use It                                              |
 | ------------------- | ------------------------------------------------------- |
-| **TanStack Router** | Type-safe routing, built-in data loading, search params |
+| **TanStack Router** | Type-safe routing, search params, nested layouts        |
+| **TanStack Query**  | Caching, background refetching, mutations, devtools     |
 | **NestJS**          | Decorators, dependency injection, scalable architecture |
 | **Turborepo**       | Monorepo tooling, parallel builds, shared configs       |
 | **Tailwind CSS**    | Rapid UI development, utility-first CSS                 |
@@ -263,73 +266,55 @@ curl -X POST http://localhost:3001/tasks \
 
 ---
 
-## Part 4: TanStack Router Frontend (20 min)
+## Part 4: TanStack Router Frontend (15 min)
 
 ### Core Concepts
 
-TanStack Router introduces several powerful patterns:
+TanStack Router handles routing with type safety:
 
 1. **File-based Routing** - Routes defined by file structure
-2. **Route Loaders** - Fetch data before rendering
-3. **Search Params** - Type-safe URL parameters
-4. **Pending/Error States** - Built-in loading and error handling
+2. **Search Params** - Type-safe URL parameters
+3. **Type-safe Links** - Compile-time checked navigation
 
 ### File-Based Routing
 
 ```
 src/routes/
-├── __root.tsx        # Layout wrapper
+├── __root.tsx        # Layout wrapper + QueryClientProvider
 ├── index.tsx         # "/" route
 └── tasks/
     ├── index.tsx     # "/tasks" route
     └── $taskId.tsx   # "/tasks/:taskId" route
 ```
 
-### Code Walkthrough: Route Loaders
+### Code Walkthrough: Search Params
 
 **Tasks List Route** (`tasks/index.tsx`):
 
 ```typescript
 export const Route = createFileRoute('/tasks/')({
-  // 1. Validate search params
+  // Type-safe search params validation
   validateSearch: (search): TasksSearch => ({
     status: search.status || 'all',
     search: search.search || '',
   }),
-
-  // 2. Declare loader dependencies
-  loaderDeps: ({ search }) => ({ search }),
-
-  // 3. Load data before render
-  loader: async ({ deps }) => {
-    return api.tasks.list({
-      status: deps.search.status,
-      search: deps.search.search,
-    });
-  },
-
-  // 4. Show while loading
-  pendingComponent: () => <TasksLoading />,
-
-  // 5. Show on error
-  errorComponent: ({ error }) => <TasksError error={error} />,
-
-  // 6. Main component
   component: TasksPage,
 });
+
+function TasksPage() {
+  // Access validated search params
+  const { status, search } = Route.useSearch();
+
+  // TanStack Query for data fetching with caching
+  const { data: tasks, isLoading, error } = useTasksQuery({ status, search });
+  // ...
+}
 ```
-
-**Key Points:**
-
-- Data loads BEFORE the component renders
-- Search params are validated and typed
-- Loading/error states are declarative
-- No `useEffect` for data fetching!
 
 ### Demo: Search Params in Action
 
 ```typescript
-// Navigate with search params
+// Navigate with search params - URL updates automatically
 navigate({
   search: (prev) => ({ ...prev, status: "done" }),
 });
@@ -337,27 +322,127 @@ navigate({
 
 Watch the URL update: `/tasks?status=done`
 
-### Code Walkthrough: Mutations
+---
 
-**Updating a Task** (`$taskId.tsx`):
+## Part 5: TanStack Query for Data Fetching (15 min)
+
+### Why TanStack Query?
+
+| Feature                   | Benefit                                    |
+| ------------------------- | ------------------------------------------ |
+| **Caching**               | Data cached and reused across components   |
+| **Background Refetching** | Stale data shown while fetching fresh      |
+| **Mutations**             | Easy create/update/delete with cache sync  |
+| **Devtools**              | Visualize cache state and queries          |
+
+### Setting Up QueryClient
+
+**Root Route** (`__root.tsx`):
 
 ```typescript
-const handleStatusChange = async (newStatus: Task["status"]) => {
-  setIsPending(true);
-  try {
-    await api.tasks.update(task.id, { status: newStatus });
-    router.invalidate(); // Refetch route data
-  } finally {
-    setIsPending(false);
-  }
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute
+    },
+  },
+});
+
+export const Route = createRootRoute({
+  component: () => (
+    <QueryClientProvider client={queryClient}>
+      <Header />
+      <Outlet />
+      <ReactQueryDevtools />
+    </QueryClientProvider>
+  ),
+});
+```
+
+### Query Keys Pattern
+
+**Centralized Query Keys** (`lib/queries.ts`):
+
+```typescript
+export const taskKeys = {
+  all: ['tasks'] as const,
+  lists: () => [...taskKeys.all, 'list'] as const,
+  list: (filters: { status?: string; search?: string }) =>
+    [...taskKeys.lists(), filters] as const,
+  details: () => [...taskKeys.all, 'detail'] as const,
+  detail: (id: string) => [...taskKeys.details(), id] as const,
 };
 ```
 
-**Key Pattern:** `router.invalidate()` triggers a refetch of all route loaders.
+**Benefits:**
+- Consistent cache keys across the app
+- Easy to invalidate related queries
+- Type-safe key generation
+
+### Query and Mutation Hooks
+
+```typescript
+// Fetching data
+export function useTasksQuery(filters: { status?: string; search?: string }) {
+  return useQuery({
+    queryKey: taskKeys.list(filters),
+    queryFn: () => api.tasks.list(filters),
+  });
+}
+
+// Mutations with cache invalidation
+export function useUpdateTaskMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => api.tasks.update(id, data),
+    onSuccess: (updatedTask) => {
+      // Update individual task cache
+      queryClient.setQueryData(taskKeys.detail(updatedTask.id), updatedTask);
+      // Invalidate lists to refetch
+      queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+    },
+  });
+}
+```
+
+### Using in Components
+
+```typescript
+function TaskDetailPage() {
+  const { taskId } = Route.useParams();
+  const { data: task, isLoading, error } = useTaskQuery(taskId);
+  const updateMutation = useUpdateTaskMutation();
+
+  const handleStatusChange = (newStatus: Task['status']) => {
+    updateMutation.mutate({ id: taskId, data: { status: newStatus } });
+  };
+
+  if (isLoading) return <Loading />;
+  if (error) return <Error error={error} />;
+
+  return (
+    <button
+      onClick={() => handleStatusChange('done')}
+      disabled={updateMutation.isPending}
+    >
+      {updateMutation.isPending ? 'Updating...' : 'Mark Done'}
+    </button>
+  );
+}
+```
+
+**Key Points:**
+- `isPending` for loading states during mutations
+- Automatic cache invalidation on success
+- No manual state management needed
 
 ---
 
-## Part 5: Connecting Frontend & Backend (10 min)
+## Part 6: Connecting Frontend & Backend (10 min)
 
 ### CORS Configuration
 
@@ -424,7 +509,7 @@ interface Task {
 
 ---
 
-## Part 6: UI Patterns (5 min)
+## Part 7: UI Patterns (5 min)
 
 ### Loading States
 
@@ -477,7 +562,7 @@ router.invalidate();
    - Type-safe search params
    - Pending and error states
 
-### TanStack Router + NestJS vs Next.js
+### This Stack vs Next.js
 
 | Choose This Stack When...         | Choose Next.js When...  |
 | --------------------------------- | ----------------------- |

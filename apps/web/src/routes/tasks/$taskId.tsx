@@ -1,51 +1,21 @@
-import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { api } from '../../lib/api';
+import { useTaskQuery, useUpdateTaskMutation, useDeleteTaskMutation } from '../../lib/queries';
 import type { Task } from '../../lib/types';
 
 export const Route = createFileRoute('/tasks/$taskId')({
-  loader: async ({ params }) => {
-    return api.tasks.get(params.taskId);
-  },
-  pendingComponent: () => <TaskLoading />,
-  errorComponent: ({ error }) => <TaskError error={error} />,
   component: TaskDetailPage,
 });
 
-function TaskLoading() {
-  return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <div className="animate-pulse space-y-4">
-        <div className="h-4 bg-gray-200 rounded w-20"></div>
-        <div className="h-10 bg-gray-200 rounded w-3/4"></div>
-        <div className="h-6 bg-gray-200 rounded w-24"></div>
-        <div className="h-24 bg-gray-200 rounded"></div>
-      </div>
-    </div>
-  );
-}
-
-function TaskError({ error }: { error: Error }) {
-  return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <Link to="/tasks" className="text-blue-600 hover:underline mb-4 inline-block">
-        &larr; Back to tasks
-      </Link>
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <h2 className="text-red-800 text-lg font-semibold">Error loading task</h2>
-        <p className="text-red-600 mt-2">{error.message}</p>
-      </div>
-    </div>
-  );
-}
-
 function TaskDetailPage() {
-  const task = Route.useLoaderData();
-  const router = useRouter();
+  const { taskId } = Route.useParams();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isPending, setIsPending] = useState(false);
+
+  const { data: task, isLoading, error } = useTaskQuery(taskId);
+  const updateMutation = useUpdateTaskMutation();
+  const deleteMutation = useDeleteTaskMutation();
 
   const statusColors: Record<Task['status'], string> = {
     todo: 'bg-gray-100 text-gray-800 border-gray-300',
@@ -53,28 +23,23 @@ function TaskDetailPage() {
     done: 'bg-green-100 text-green-800 border-green-300',
   };
 
-  const handleStatusChange = async (newStatus: Task['status']) => {
-    setIsPending(true);
-    try {
-      await api.tasks.update(task.id, { status: newStatus });
-      router.invalidate();
-    } catch (error) {
-      console.error('Failed to update status:', error);
-    } finally {
-      setIsPending(false);
-    }
+  const handleStatusChange = (newStatus: Task['status']) => {
+    updateMutation.mutate({ id: taskId, data: { status: newStatus } });
   };
 
-  const handleDelete = async () => {
-    setIsPending(true);
-    try {
-      await api.tasks.delete(task.id);
-      navigate({ to: '/tasks' });
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-      setIsPending(false);
-    }
+  const handleDelete = () => {
+    deleteMutation.mutate(taskId, {
+      onSuccess: () => navigate({ to: '/tasks' }),
+    });
   };
+
+  if (isLoading) {
+    return <TaskLoading />;
+  }
+
+  if (error || !task) {
+    return <TaskError error={error || new Error('Task not found')} />;
+  }
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
@@ -101,7 +66,7 @@ function TaskDetailPage() {
           </div>
         </div>
 
-        {/* Status Selector - Demonstrates mutations with pending state */}
+        {/* Status Selector */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
           <div className="flex gap-2">
@@ -109,7 +74,7 @@ function TaskDetailPage() {
               <button
                 key={status}
                 onClick={() => handleStatusChange(status)}
-                disabled={isPending}
+                disabled={updateMutation.isPending}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all disabled:opacity-50 ${
                   task.status === status
                     ? statusColors[status] + ' border-current'
@@ -120,7 +85,7 @@ function TaskDetailPage() {
               </button>
             ))}
           </div>
-          {isPending && (
+          {updateMutation.isPending && (
             <p className="text-sm text-blue-600 mt-2 animate-pulse">Updating...</p>
           )}
         </div>
@@ -158,10 +123,10 @@ function TaskDetailPage() {
               </button>
               <button
                 onClick={handleDelete}
-                disabled={isPending}
+                disabled={deleteMutation.isPending}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {isPending ? 'Deleting...' : 'Delete'}
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
@@ -171,24 +136,45 @@ function TaskDetailPage() {
   );
 }
 
+function TaskLoading() {
+  return (
+    <div className="p-8 max-w-2xl mx-auto">
+      <div className="animate-pulse space-y-4">
+        <div className="h-4 bg-gray-200 rounded w-20"></div>
+        <div className="h-10 bg-gray-200 rounded w-3/4"></div>
+        <div className="h-6 bg-gray-200 rounded w-24"></div>
+        <div className="h-24 bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  );
+}
+
+function TaskError({ error }: { error: Error }) {
+  return (
+    <div className="p-8 max-w-2xl mx-auto">
+      <Link to="/tasks" className="text-blue-600 hover:underline mb-4 inline-block">
+        &larr; Back to tasks
+      </Link>
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <h2 className="text-red-800 text-lg font-semibold">Error loading task</h2>
+        <p className="text-red-600 mt-2">{error.message}</p>
+      </div>
+    </div>
+  );
+}
+
 function EditTaskModal({ task, onClose }: { task: Task; onClose: () => void }) {
-  const router = useRouter();
-  const [isPending, setIsPending] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const updateMutation = useUpdateTaskMutation();
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsPending(true);
-    try {
-      await api.tasks.update(task.id, { title, description });
-      router.invalidate();
-      onClose();
-    } catch (error) {
-      console.error('Failed to update task:', error);
-    } finally {
-      setIsPending(false);
-    }
+    updateMutation.mutate(
+      { id: task.id, data: { title, description } },
+      { onSuccess: () => onClose() }
+    );
   };
 
   return (
@@ -225,10 +211,10 @@ function EditTaskModal({ task, onClose }: { task: Task; onClose: () => void }) {
             </button>
             <button
               type="submit"
-              disabled={isPending}
+              disabled={updateMutation.isPending}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {isPending ? 'Saving...' : 'Save Changes'}
+              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
