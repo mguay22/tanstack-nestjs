@@ -1,8 +1,1 @@
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'todo' | 'in-progress' | 'done';
-  createdAt: string;
-  updatedAt: string;
-}
+export type { Task, TaskStatus } from '@repo/shared-types';

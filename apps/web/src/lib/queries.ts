@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
-import type { Task } from './types';
+import type { CreateTaskDto, UpdateTaskDto } from './types';
 
 // Query Keys - centralized for easy cache management
 export const taskKeys = {
@@ -32,7 +32,7 @@ export function useCreateTaskMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { title: string; description?: string }) =>
+    mutationFn: (data: CreateTaskDto) =>
       api.tasks.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
@@ -44,7 +44,7 @@ export function useUpdateTaskMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Task> }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateTaskDto }) =>
       api.tasks.update(id, data),
     onSuccess: (updatedTask) => {
       // Update the individual task cache

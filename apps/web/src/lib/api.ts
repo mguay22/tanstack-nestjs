@@ -1,4 +1,4 @@
-import type { Task } from './types';
+import type { Task, CreateTaskDto, UpdateTaskDto } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -24,7 +24,7 @@ export const api = {
       return res.json();
     },
 
-    create: async (data: { title: string; description?: string }): Promise<Task> => {
+    create: async (data: CreateTaskDto): Promise<Task> => {
       const res = await fetch(`${API_URL}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,7 +34,7 @@ export const api = {
       return res.json();
     },
 
-    update: async (id: string, data: Partial<Task>): Promise<Task> => {
+    update: async (id: string, data: UpdateTaskDto): Promise<Task> => {
       const res = await fetch(`${API_URL}/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

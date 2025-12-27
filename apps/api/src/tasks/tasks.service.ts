@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Task } from './task.entity';
+import { Task, CreateTaskDto as CreateTaskDtoType, UpdateTaskDto as UpdateTaskDtoType } from '@repo/shared-types';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
@@ -59,11 +59,12 @@ export class TasksService {
     return task;
   }
 
-  create(createTaskDto: CreateTaskDto): Task {
+  create(createTaskDto: CreateTaskDto | CreateTaskDtoType): Task {
+    const dto = createTaskDto as CreateTaskDtoType;
     const task: Task = {
       id: Date.now().toString(),
-      title: createTaskDto.title,
-      description: createTaskDto.description || '',
+      title: dto.title,
+      description: dto.description || '',
       status: 'todo',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -72,9 +73,10 @@ export class TasksService {
     return task;
   }
 
-  update(id: string, updateTaskDto: UpdateTaskDto): Task {
+  update(id: string, updateTaskDto: UpdateTaskDto | UpdateTaskDtoType): Task {
     const task = this.findOne(id);
-    Object.assign(task, updateTaskDto, { updatedAt: new Date().toISOString() });
+    const dto = updateTaskDto as UpdateTaskDtoType;
+    Object.assign(task, dto, { updatedAt: new Date().toISOString() });
     return task;
   }
 

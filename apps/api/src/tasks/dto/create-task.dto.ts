@@ -1,4 +1,4 @@
-export class CreateTaskDto {
-  title: string;
-  description?: string;
-}
+import { createZodDto } from 'nestjs-zod';
+import { CreateTaskDtoSchema } from '@repo/shared-types';
+
+export class CreateTaskDto extends createZodDto(CreateTaskDtoSchema) {}

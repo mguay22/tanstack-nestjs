@@ -1,16 +1,16 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTasksQuery, useCreateTaskMutation } from '../../lib/queries';
-import type { Task, TaskStatus } from '../../lib/types';
+import type { Task, TaskStatusFilter } from '../../lib/types';
 
 type TasksSearch = {
-  status?: TaskStatus;
+  status?: TaskStatusFilter;
   search?: string;
 };
 
 export const Route = createFileRoute('/tasks/')({
   validateSearch: (search: Record<string, unknown>): TasksSearch => ({
-    status: (search.status as TaskStatus) || 'all',
+    status: (search.status as TaskStatusFilter) || 'all',
     search: (search.search as string) || '',
   }),
   component: TasksPage,
@@ -30,7 +30,7 @@ function TasksPage() {
     done: 'bg-green-100 text-green-800',
   };
 
-  const handleStatusFilter = (newStatus: TaskStatus) => {
+  const handleStatusFilter = (newStatus: TaskStatusFilter) => {
     navigate({
       search: (prev) => ({ ...prev, status: newStatus }),
     });
