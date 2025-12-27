@@ -10,4 +10,4 @@ export {
   type CreateTaskDto,
   type UpdateTaskDto,
   type TaskQueryParams,
-} from './task.schema.js';
+} from './task.schema';
